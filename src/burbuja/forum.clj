@@ -116,6 +116,80 @@
        " [post:" post-id "]\n\n"
        content))
 
+(defn list-alerts []
+  (let [base "https://www.burbuja.info/inmobiliaria/account/alerts"
+        pages (for [p [1 2 3]]
+                (let [url (if (= p 1) base (str base "?page=" p))
+                      resp (get-page url)]
+                  (when (= 200 (:status resp))
+                    (Jsoup/parse ^String (:body resp)))))
+        alerts (for [doc pages
+                     :when doc
+                     li (.select doc "li[data-alert-id]")
+                     :let [body (.text li)
+                           is-quote (str/includes? body "citó tu mensaje")
+                           is-reply (str/includes? body "respondió al tema")
+                           post-link (some-> (.selectFirst li "a.fauxBlockLink-blockLink")
+                                             (.attr "href"))
+                           user (some-> (.selectFirst li "a.username") (.text))
+                           time-el (some-> (.selectFirst li "time") (.attr "data-short"))]
+                     :when (and (or is-quote is-reply) (seq post-link))]
+                 {:user (or user "?")
+                  :type (if is-quote "quote" "reply")
+                  :time (or time-el "?")
+                  :url (if (str/starts-with? post-link "http")
+                         post-link
+                         (str "https://www.burbuja.info" post-link))})]
+    (str "# Alerts (" (count alerts) " quotes/replies)\n\n"
+         (str/join "\n" (map (fn [{:keys [user type time url]}]
+                               (str "[" time "] " user " (" type "): " url))
+                             alerts)))))
+
+(defn list-new-posts []
+  (let [resp (get-page "https://www.burbuja.info/inmobiliaria/whats-new/posts/")]
+    (when-not (= 200 (:status resp))
+      (throw (ex-info (str "HTTP " (:status resp) " fetching new posts") {})))
+    (let [doc (Jsoup/parse ^String (:body resp))
+          links (.select doc "a[data-preview-url]")
+          seen (atom #{})
+          threads (for [^Element a links
+                        :let [href (.attr a "href")
+                              title (str/trim (.text a))
+                              clean (str/replace href #"(page-\d+|post-\d+|unread|/latest)/?$" "")]
+                        :when (and (re-find #"/temas/" href)
+                                   (seq title)
+                                   (not (contains? @seen clean)))]
+                    (do (swap! seen conj clean)
+                        {:title title
+                         :url (if (str/starts-with? clean "http")
+                                clean
+                                (str "https://www.burbuja.info" clean))}))]
+      (str "# New posts (" (count threads) " threads)\n\n"
+           (str/join "\n" (map-indexed
+                            (fn [i {:keys [title url]}]
+                              (str (inc i) ". " title "\n   " url))
+                            threads))))))
+
+(defn list-trending []
+  (let [resp (get-page "https://www.burbuja.info/inmobiliaria/trending/")]
+    (when-not (= 200 (:status resp))
+      (throw (ex-info (str "HTTP " (:status resp) " fetching trending") {})))
+    (let [doc (Jsoup/parse ^String (:body resp))
+          items (.select doc "a[data-preview-url]")
+          threads (for [^Element a items
+                        :let [href (.attr a "href")
+                              title (str/trim (.text a))]
+                        :when (and (re-find #"/temas/" href) (seq title))]
+                    {:title title
+                     :url (if (str/starts-with? href "http")
+                            href
+                            (str "https://www.burbuja.info" href))})]
+      (str "# Trending threads (" (count threads) ")\n\n"
+           (str/join "\n" (map-indexed
+                            (fn [i {:keys [title url]}]
+                              (str (inc i) ". " title "\n   " url))
+                            threads))))))
+
 (defn read-thread [thread-url]
   (let [resp (get-page thread-url)]
     (when-not (= 200 (:status resp))

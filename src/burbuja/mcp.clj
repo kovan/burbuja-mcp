@@ -12,6 +12,15 @@
                   :properties {:thread_url {:type "string"
                                             :description "Full thread URL, e.g. https://www.burbuja.info/inmobiliaria/temas/example.12345/"}}
                   :required ["thread_url"]}}
+   {:name "list_alerts"
+    :description "List recent quote and reply alerts from burbuja.info (last 3 pages). Shows who quoted or replied to your posts."
+    :inputSchema {:type "object" :properties {}}}
+   {:name "list_new_posts"
+    :description "List threads with new posts on burbuja.info (whats-new feed). Returns thread titles and URLs."
+    :inputSchema {:type "object" :properties {}}}
+   {:name "list_trending"
+    :description "List today's trending threads on burbuja.info. Returns thread titles and URLs."
+    :inputSchema {:type "object" :properties {}}}
    {:name "reply_comment"
     :description "Reply to a specific post on burbuja.info, quoting the original post."
     :inputSchema {:type "object"
@@ -46,6 +55,15 @@
     (let [result (case name
                    "read_thread"
                    (forum/read-thread (:thread_url arguments))
+
+                   "list_alerts"
+                   (forum/list-alerts)
+
+                   "list_new_posts"
+                   (forum/list-new-posts)
+
+                   "list_trending"
+                   (forum/list-trending)
 
                    "reply_comment"
                    (forum/reply-comment (:post_url arguments) (:message arguments))

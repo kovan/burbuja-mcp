@@ -128,21 +128,19 @@
                      li (.select doc "li[data-alert-id]")
                      :let [body (.text li)
                            is-quote (str/includes? body "citó tu mensaje")
-                           is-reply (str/includes? body "respondió al tema")
                            post-link (some-> (.selectFirst li "a.fauxBlockLink-blockLink")
                                              (.attr "href"))
                            user (some-> (.selectFirst li "a.username") (.text))
                            time-el (some-> (.selectFirst li "time") (.attr "data-short"))]
-                     :when (and (or is-quote is-reply) (seq post-link))]
+                     :when (and is-quote (seq post-link))]
                  {:user (or user "?")
-                  :type (if is-quote "quote" "reply")
                   :time (or time-el "?")
                   :url (if (str/starts-with? post-link "http")
                          post-link
                          (str "https://www.burbuja.info" post-link))})]
-    (str "# Alerts (" (count alerts) " quotes/replies)\n\n"
-         (str/join "\n" (map (fn [{:keys [user type time url]}]
-                               (str "[" time "] " user " (" type "): " url))
+    (str "# Alerts (" (count alerts) " quotes)\n\n"
+         (str/join "\n" (map (fn [{:keys [user time url]}]
+                               (str "[" time "] " user ": " url))
                              alerts)))))
 
 (defn list-new-posts []
@@ -207,7 +205,7 @@
            " (" (count posts) " posts on this page)\n\n"
            (str/join "\n\n---\n\n" (map format-post posts))))))
 
-(defn reply-comment [post-url message]
+(defn reply-comment [post-url message & {:keys [expected-thread]}]
   (let [resp (get-page post-url)]
     (when-not (= 200 (:status resp))
       (throw (ex-info (str "HTTP " (:status resp) " fetching post") {:url post-url})))
@@ -216,6 +214,15 @@
           post-id (or (second (re-find #"post-(\d+)" post-url))
                       (second (re-find #"posts/(\d+)" post-url))
                       (throw (ex-info "Cannot extract post ID from URL" {:url post-url})))
+          ;; Validate thread if expected-thread is provided
+          canonical (some-> (.selectFirst doc "link[rel=canonical]") (.attr "href"))
+          _ (when (and expected-thread canonical)
+              (let [actual-thread (second (re-find #"(.*?/temas/[^/]+/)" canonical))
+                    expected-base (second (re-find #"(.*?/temas/[^/]+)" expected-thread))]
+                (when (and actual-thread expected-base
+                           (not (str/starts-with? actual-thread expected-base)))
+                  (throw (ex-info (str "Post " post-id " belongs to a different thread. Expected: " expected-thread " but post is in: " actual-thread)
+                                  {:expected expected-thread :actual actual-thread})))))
           ;; Find the post on the page
           post-el (or (.selectFirst doc (str "article[data-content=post-" post-id "]"))
                       (.selectFirst doc (str "#js-post-" post-id))

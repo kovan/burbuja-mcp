@@ -1,0 +1,1 @@
+src:/home/k/.m2/repository/org/clojure/clojure/1.12.0/clojure-1.12.0.jar:/home/k/.m2/repository/org/clojure/data.json/2.5.0/data.json-2.5.0.jar:/home/k/.m2/repository/org/jsoup/jsoup/1.12.1/jsoup-1.12.1.jar:/home/k/.m2/repository/org/clojure/core.specs.alpha/0.4.74/core.specs.alpha-0.4.74.jar:/home/k/.m2/repository/org/clojure/spec.alpha/0.5.238/spec.alpha-0.5.238.jar

@@ -27,7 +27,9 @@
                   :properties {:post_url {:type "string"
                                           :description "URL of the post to reply to, e.g. https://www.burbuja.info/inmobiliaria/temas/example.12345/post-67890 or https://www.burbuja.info/inmobiliaria/posts/67890/"}
                                :message {:type "string"
-                                         :description "Reply text (BBCode supported)"}}
+                                         :description "Reply text (BBCode supported)"}
+                               :thread_url {:type "string"
+                                            :description "Expected thread URL. If provided, the reply will fail if the post does not belong to this thread. Use this to prevent posting to the wrong thread."}}
                   :required ["post_url" "message"]}}])
 
 (defn- respond [id result]
@@ -66,7 +68,8 @@
                    (forum/list-trending)
 
                    "reply_comment"
-                   (forum/reply-comment (:post_url arguments) (:message arguments))
+                   (forum/reply-comment (:post_url arguments) (:message arguments)
+                                        :expected-thread (:thread_url arguments))
 
                    (throw (ex-info (str "Unknown tool: " name) {})))]
       (respond id (tool-result result)))

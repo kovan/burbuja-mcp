@@ -116,32 +116,44 @@
        " [post:" post-id "]\n\n"
        content))
 
-(defn list-alerts []
-  (let [base "https://www.burbuja.info/inmobiliaria/account/alerts"
-        pages (for [p [1 2 3]]
+(defn list-alerts
+  ([] (list-alerts 3 nil))
+  ([num-pages max-hours]
+   (let [base "https://www.burbuja.info/inmobiliaria/account/alerts"
+         now-ms (System/currentTimeMillis)
+         docs (for [p (range 1 (inc num-pages))]
                 (let [url (if (= p 1) base (str base "?page=" p))
                       resp (get-page url)]
                   (when (= 200 (:status resp))
                     (Jsoup/parse ^String (:body resp)))))
-        alerts (for [doc pages
-                     :when doc
-                     li (.select doc "li[data-alert-id]")
-                     :let [body (.text li)
-                           is-quote (str/includes? body "citó tu mensaje")
-                           post-link (some-> (.selectFirst li "a.fauxBlockLink-blockLink")
-                                             (.attr "href"))
-                           user (some-> (.selectFirst li "a.username") (.text))
-                           time-el (some-> (.selectFirst li "time") (.attr "data-short"))]
-                     :when (and is-quote (seq post-link))]
-                 {:user (or user "?")
-                  :time (or time-el "?")
-                  :url (if (str/starts-with? post-link "http")
-                         post-link
-                         (str "https://www.burbuja.info" post-link))})]
-    (str "# Alerts (" (count alerts) " quotes)\n\n"
-         (str/join "\n" (map (fn [{:keys [user time url]}]
-                               (str "[" time "] " user ": " url))
-                             alerts)))))
+         alerts (for [doc docs
+                      :when doc
+                      li (.select doc "li[data-alert-id]")
+                      :let [body (.text li)
+                            is-quote (str/includes? body "citó tu mensaje")
+                            post-link (some-> (.selectFirst li "a.fauxBlockLink-blockLink")
+                                              (.attr "href"))
+                            user (some-> (.selectFirst li "a.username") (.text))
+                            time-el (some-> (.selectFirst li "time") (.attr "data-short"))
+                            epoch-str (some-> (.selectFirst li "time") (.attr "data-time"))
+                            epoch-ms (when (seq epoch-str)
+                                       (try (* (parse-long epoch-str) 1000)
+                                            (catch Exception _ nil)))
+                            age-hours (when epoch-ms
+                                        (/ (double (- now-ms epoch-ms)) 3600000.0))]
+                      :when (and is-quote (seq post-link))
+                      :when (or (nil? max-hours)
+                                (nil? age-hours)
+                                (<= age-hours max-hours))]
+                  {:user (or user "?")
+                   :time (or time-el "?")
+                   :url (if (str/starts-with? post-link "http")
+                          post-link
+                          (str "https://www.burbuja.info" post-link))})]
+     (str "# Alerts (" (count alerts) " quotes)\n\n"
+          (str/join "\n" (map (fn [{:keys [user time url]}]
+                                (str "[" time "] " user ": " url))
+                              alerts))))))
 
 (defn list-new-posts []
   (let [resp (get-page "https://www.burbuja.info/inmobiliaria/whats-new/posts/")]

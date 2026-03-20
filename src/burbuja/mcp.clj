@@ -13,8 +13,12 @@
                                             :description "Full thread URL, e.g. https://www.burbuja.info/inmobiliaria/temas/example.12345/"}}
                   :required ["thread_url"]}}
    {:name "list_alerts"
-    :description "List recent quote and reply alerts from burbuja.info (last 3 pages). Shows who quoted or replied to your posts."
-    :inputSchema {:type "object" :properties {}}}
+    :description "List recent quote and reply alerts from burbuja.info. Shows who quoted or replied to your posts."
+    :inputSchema {:type "object"
+                  :properties {:pages {:type "number"
+                                       :description "Number of alert pages to fetch (default 3, max 10)"}
+                               :hours {:type "number"
+                                       :description "Only show alerts from the last N hours (optional, omit for all)"}}}}
    {:name "list_new_posts"
     :description "List threads with new posts on burbuja.info (whats-new feed). Returns thread titles and URLs."
     :inputSchema {:type "object" :properties {}}}
@@ -59,7 +63,11 @@
                    (forum/read-thread (:thread_url arguments))
 
                    "list_alerts"
-                   (forum/list-alerts)
+                   (let [pages (when-let [p (:pages arguments)]
+                                 (min (max (int (if (string? p) (parse-long p) p)) 1) 10))
+                         hours (when-let [h (:hours arguments)]
+                                 (if (string? h) (parse-double h) (double h)))]
+                     (forum/list-alerts (or pages 3) hours))
 
                    "list_new_posts"
                    (forum/list-new-posts)
